@@ -1,0 +1,38 @@
+USE [Carte]
+GO
+/****** Object:  StoredProcedure [dbo].[Messages_SelectByRece]    Script Date: 10/21/2022 9:32:12 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE PROC [dbo].[Messages_SelectByRece] @RecipientId INT
+AS
+/* TEST CODE
+DECLARE @RecipientId INT = 164
+
+EXECUTE Messages_SelectByRece @RecipientId
+*/
+BEGIN
+	SELECT distinct
+		RecipientAvatar = p2.AvatarUrl
+		,RecipientName = (
+			p2.FirstName + ' ' + p2.LastName
+			)
+		,Conversation = (
+			Select TOP (1) c.id, c.Message, c.Subject, c.RecipientId, c.DateSent, c.DateRead
+			from dbo.Messages as c
+			WHERE (m.SenderId = c.SenderId or 
+				m.SenderId = c.RecipientId) and 
+				(m.RecipientId = c.RecipientId or
+				m.RecipientId = c.SenderId)
+			order by c.Id desc
+			for json path
+		)
+		,p2.UserId
+	FROM dbo.Messages AS m
+	INNER JOIN dbo.UserProfiles AS p1 ON (m.RecipientId = p1.UserId)
+	INNER JOIN dbo.UserProfiles AS p2 ON (m.SenderId = p2.UserId)
+	WHERE @RecipientId = p1.UserId and p1.IsDeleted = 0
+END
+GO

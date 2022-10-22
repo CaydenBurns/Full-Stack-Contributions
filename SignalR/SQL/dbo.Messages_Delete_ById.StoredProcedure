@@ -1,0 +1,39 @@
+USE [Carte]
+GO
+/****** Object:  StoredProcedure [dbo].[Messages_Delete_ById]    Script Date: 10/21/2022 9:32:12 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE PROC [dbo].[Messages_Delete_ById] 
+ @Id INT
+,@SenderId int
+AS
+/* TEST CODE
+SELECT *
+FROM dbo.messages
+
+DECLARE @Id INT = 160, @SenderId int = 162
+
+EXECUTE dbo.Messages_Delete_ById @Id, @SenderId
+
+SELECT *
+FROM dbo.messages
+*/
+BEGIN
+
+SELECT 
+		m.Id
+		,RecipientId
+	FROM dbo.Messages AS m
+	INNER JOIN dbo.UserProfiles AS up ON (m.SenderId = up.UserId)
+	WHERE @Id = m.Id
+
+	DELETE
+	FROM dbo.Messages
+	WHERE Id = @Id AND SenderId = @SenderId
+
+		
+END
+GO

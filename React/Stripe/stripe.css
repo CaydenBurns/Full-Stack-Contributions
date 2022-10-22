@@ -1,0 +1,16 @@
+.horseFeed{
+    height: 500px;
+}
+
+.viewSubscriptionImg{
+    height: 200px;
+    width: 200px;
+}
+
+.cardView{
+    width: 600px !important;
+}
+
+.sub{
+    font-size: large;
+}

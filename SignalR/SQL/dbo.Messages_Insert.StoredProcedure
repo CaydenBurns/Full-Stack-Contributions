@@ -1,0 +1,64 @@
+USE [Carte]
+GO
+/****** Object:  StoredProcedure [dbo].[Messages_Insert]    Script Date: 10/21/2022 9:32:12 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+CREATE PROC [dbo].[Messages_Insert] @Message NVARCHAR(1000)
+	,@Subject NVARCHAR(100)
+	,@RecipientId INT
+	,@SenderId INT
+	,@Id INT OUTPUT
+AS
+/* TEST CODE
+SELECT *
+FROM dbo.messages
+
+DECLARE @Id INT
+DECLARE @Message NVARCHAR(1000) = 'sl1'
+	,@Subject NVARCHAR(100) = 'sl1'
+	,@RecipientId INT = 46
+	,@SenderId INT = 162
+
+
+EXECUTE dbo.Messages_Insert @Message
+	,@Subject
+	,@RecipientId
+	,@SenderId
+	,@Id 
+
+
+SELECT * 
+FROM dbo.messages
+*/
+BEGIN
+	INSERT INTO dbo.Messages (
+		Message
+		,Subject
+		,RecipientId
+		,SenderId
+		)
+	VALUES (
+		@Message
+		,@Subject
+		,@RecipientId
+		,@SenderId
+		)
+
+	SET @Id = SCOPE_IDENTITY()
+
+	SELECT senderName = (up.FirstName + ' ' + up.LastName)
+		,senderAvatar = up.AvatarUrl
+		,Message
+		,m.Id
+		,DateSent
+		,SenderId
+		,RecipientId
+	FROM dbo.Messages AS m
+	INNER JOIN dbo.UserProfiles AS up ON (m.SenderId = up.UserId)
+	WHERE @Id = m.Id
+END
+GO

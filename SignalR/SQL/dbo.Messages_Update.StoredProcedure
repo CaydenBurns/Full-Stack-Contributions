@@ -1,0 +1,62 @@
+USE [Carte]
+GO
+/****** Object:  StoredProcedure [dbo].[Messages_Update]    Script Date: 10/21/2022 9:32:12 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+
+CREATE PROC [dbo].[Messages_Update] 
+	 @Message NVARCHAR(1000)
+	,@Subject NVARCHAR(100)
+	,@Id INT
+	,@SenderId INT
+AS
+/* TEST CODE
+
+DECLARE @Id INT = 20
+
+SELECT *
+FROM dbo.messages
+WHERE Id = @Id
+
+DECLARE 
+	 @Message NVARCHAR(1000) = 'Hello Lisa'
+	,@Subject NVARCHAR(100) = 'Update UTC test2'
+
+EXECUTE Messages_Update 
+	 @Message
+	,@Subject
+	,@Id
+
+SELECT *
+FROM dbo.messages
+WHERE Id = @Id
+
+select * from userprofiles
+select * from users
+
+*/
+BEGIN
+	UPDATE dbo.Messages
+	SET 
+		 Message = @Message
+		,Subject = @Subject
+		,DateModified = GETUTCDATE()
+		,DateSent = GETUTCDATE()
+	WHERE Id = @Id
+	AND SenderId = @SenderId
+
+		SELECT senderName = (up.FirstName + ' ' + up.LastName)
+		,senderAvatar = up.AvatarUrl
+		,Message
+		,m.Id
+		,DateSent
+		,SenderId
+		,RecipientId
+	FROM dbo.Messages AS m
+	INNER JOIN dbo.UserProfiles AS up ON (m.SenderId = up.UserId)
+	WHERE @Id = m.Id
+END
+GO

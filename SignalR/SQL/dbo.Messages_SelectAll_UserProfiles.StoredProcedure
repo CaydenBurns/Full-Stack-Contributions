@@ -1,0 +1,45 @@
+USE [Carte]
+GO
+/****** Object:  StoredProcedure [dbo].[Messages_SelectAll_UserProfiles]    Script Date: 10/21/2022 9:32:12 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE proc [dbo].[Messages_SelectAll_UserProfiles]
+@SenderId int
+AS
+/* TEST CODE
+DECLARE @SenderId INT = 162
+
+EXECUTE Messages_SelectAll_UserProfiles @SenderId
+
+select * from messages where senderId = 162 or recipientId = 162
+
+select * from userprofiles
+*/
+begin 
+
+SELECT distinct 
+		Avatar = up.AvatarUrl
+		,Name = (
+			up.FirstName + ' ' + up.LastName
+			)
+		,Conversation = (
+			Select TOP (1) c.id, c.Message, c.Subject, c.RecipientId, c.DateSent, c.DateRead
+			from dbo.Messages as c
+			INNER JOIN dbo.UserProfiles AS op ON (c.SenderId = up.UserId or c.RecipientId = up.UserId)
+			WHERE (c.SenderId = @SenderId or c.RecipientId = @SenderId)
+			order by c.Id desc
+			for json path
+		)
+		,up.UserId
+		
+	FROM dbo.Messages AS m
+	INNER JOIN dbo.UserProfiles AS up ON (m.SenderId = up.UserId or m.RecipientId = up.UserId)
+	
+	WHERE @SenderId != up.UserId and up.IsDeleted = 0 and m.SenderId = @SenderId 
+
+	
+	
+END
+GO

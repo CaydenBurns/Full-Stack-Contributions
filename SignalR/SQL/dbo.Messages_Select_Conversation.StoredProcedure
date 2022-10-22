@@ -1,0 +1,50 @@
+USE [Carte]
+GO
+/****** Object:  StoredProcedure [dbo].[Messages_Select_Conversation]    Script Date: 10/21/2022 9:32:12 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE PROC [dbo].[Messages_Select_Conversation] 
+	 @SenderId INT
+	,@RecipientId INT
+AS
+/* TEST CODE
+DECLARE @SenderId INT = 162
+	   ,@RecipientId INT = 161
+
+EXECUTE [dbo].[Messages_Select_Conversation] 
+	 @SenderId
+	,@RecipientId
+
+	select * from messages
+	select * from userprofiles
+*/
+BEGIN
+
+	SELECT 
+		SenderAvatar = sender.AvatarUrl
+		,SenderName = (
+			sender.FirstName + ' ' + sender.LastName
+			)
+		,RecipientAvatar = recipient.AvatarUrl
+		,RecipientName = (
+			recipient.FirstName + ' ' + recipient.LastName
+			)
+		,m.Id
+		,Message
+		,Subject
+		,RecipientId
+		,DateSent
+		,DateRead
+
+	FROM dbo.Messages AS m
+	INNER JOIN dbo.UserProfiles AS sender ON (m.SenderId = sender.UserId)
+	INNER JOIN dbo.UserProfiles AS recipient ON (m.RecipientId = recipient.UserId) 
+	WHERE @RecipientId = recipient.UserId
+		AND  @SenderId  = sender.UserId
+		OR @RecipientId = sender.UserId AND
+		@SenderId = recipient.UserId
+END
+GO

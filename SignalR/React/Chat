@@ -1,0 +1,227 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { HubConnectionBuilder } from '@microsoft/signalr';
+import { Row, Col } from 'react-bootstrap';
+import logger from 'sabio-debug';
+import MessageService from '../../services/messageService';
+import PropTypes from 'prop-types';
+import toastr from 'toastr';
+import * as helper from '../../services/serviceHelpers';
+
+// components
+import ChatUsers from './ChatUsers';
+import ChatArea from './ChatArea';
+import UserMessage from './UserMessage';
+import UserCard from './UserCard';
+
+const _logger = logger.extend('Chat');
+
+const Chat = ({ currentUser }) => {
+    const [userMessages, setUserMessages] = useState({ arrayOfMessages: [], messageComponents: [] });
+    const [userCards, setUserCards] = useState([]);
+    const [filteredCards, setFilteredCards] = useState({ filteredArr: [], toggle: false });
+    const [selectedUser, setSelectedUser] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const latestChat = useRef(null);
+
+    latestChat.current = userMessages.arrayOfMessages;
+
+    // Gets the current messages for logged in user
+    useEffect(() => {
+        MessageService.getBySenderId().then(getChatUsers).catch(getChatUsersErr);
+    }, []);
+
+    useEffect(() => {
+        // Connection for SignalR
+        const connection = new HubConnectionBuilder()
+            .withUrl(`${helper.API_HOST_PREFIX}/apps/chat`)
+            .withAutomaticReconnect()
+            .build();
+
+        connection
+            .start()
+            .then(() => {
+                _logger('Connected!');
+                connection.on('OnMessageAdd', (message) => {
+                    const updatedChat = [...latestChat.current];
+                    updatedChat.push(message);
+                    setUserMessages((prevState) => {
+                        const allMsgs = { ...prevState };
+                        allMsgs.arrayOfMessages = updatedChat;
+                        allMsgs.messageComponents = allMsgs.arrayOfMessages.map(mapUserMessage);
+                        return allMsgs;
+                    });
+                });
+                connection.on('OnMessageUpdate', (message) => {
+                    _logger(message);
+                    let updatedChat = [...latestChat.current];
+                    let msgToUpdate = updatedChat.filter((e) => Number(e.id) === Number(message.id));
+                    let [newMsg] = msgToUpdate;
+                    newMsg.message = message.message;
+                    newMsg.dateSent = message.dateSent;
+                    updatedChat = updatedChat.filter((e) => Number(e.id) !== Number(message.id));
+                    updatedChat.push(newMsg);
+                    setUserMessages((prevState) => {
+                        const allMsgs = { ...prevState };
+                        allMsgs.arrayOfMessages = updatedChat;
+                        allMsgs.messageComponents = allMsgs.arrayOfMessages.map(mapUserMessage);
+                        return allMsgs;
+                    });
+                });
+                connection.on('OnMessageDelete', (message) => {
+                    _logger(message);
+                    const updatedChat = [...latestChat.current];
+                    setUserMessages((prevState) => {
+                        const allMsgs = { ...prevState };
+                        allMsgs.arrayOfMessages = updatedChat.filter((e) => e.id !== Number(message.id));
+                        allMsgs.messageComponents = allMsgs.arrayOfMessages.map(mapUserMessage);
+                        return allMsgs;
+                    });
+                });
+            })
+            .catch((e) => _logger('Connection failed: ', e));
+    }, []);
+
+    // On user change get messages between logged in user and selected
+    const onUserChange = (user) => {
+        _logger(user, 'User ID here');
+        setSelectedUser(user);
+        MessageService.getConversations(user.userId).then(getMessagesForUser).catch(getMsgsError);
+    };
+
+    // Gets users to display on left side
+    const getChatUsers = (response) => {
+        let usersArray = response.items;
+        // filtering out the current logged in user to display cards on left side
+        let filteredArr = usersArray.filter((e) => e.userId !== currentUser.id);
+        setSelectedUser(filteredArr[0]);
+        onUserChange(filteredArr[0]);
+        setUserCards(filteredArr);
+    };
+
+    // Fetches the messages for selected user
+    const getMessagesForUser = useCallback(
+        (response) => {
+            let msgsArray = response.items;
+            setLoading(true);
+            setTimeout(() => {
+                setUserMessages((prevState) => {
+                    let allMsgs = { ...prevState };
+                    allMsgs.arrayOfMessages = msgsArray;
+                    allMsgs.messageComponents = allMsgs.arrayOfMessages.map(mapUserMessage);
+                    return allMsgs;
+                });
+                setLoading(false);
+            }, 750);
+        },
+        [currentUser]
+    );
+
+    // Sends the chat message
+    const sendChatMessage = (e, values) => {
+        let newUserMessage = {
+            recipientId: selectedUser.userId,
+            subject: 'subject',
+            message: values.target[0].value,
+        };
+        values.target.reset();
+        MessageService.add(newUserMessage).then(onMsgSendSuccess).catch(msgSendError);
+    };
+
+    const searchUsers = (text) => {
+        let newUsers = [...userCards];
+        newUsers = newUsers.filter((e) => e.recipientName.toLowerCase().indexOf(text.toLowerCase()) >= 0);
+        if (text) {
+            setFilteredCards((prevState) => {
+                let newCards = { ...prevState };
+                newCards.filteredArr = newUsers;
+                newCards.toggle = true;
+                return newCards;
+            });
+        } else {
+            setFilteredCards((prevState) => {
+                let newCards = { ...prevState };
+                newCards.filteredArr = null;
+                newCards.toggle = false;
+                return newCards;
+            });
+        }
+    };
+
+    const mapUserMessage = ({ message, senderAvatar, senderName, recipientId, dateSent, id }) => {
+        return (
+            <UserMessage
+                key={id}
+                id={id}
+                message={message}
+                currentUser={currentUser}
+                senderAvatar={senderAvatar}
+                senderName={senderName}
+                recipientId={recipientId}
+                dateSent={dateSent}
+            />
+        );
+    };
+
+    const mapUserCards = (user, id) => {
+        return <UserCard user={user} key={id} onUserSelect={onUserChange} selectedUser={selectedUser} />;
+    };
+
+    //#region Error/Success Handlers
+
+    const onMsgSendSuccess = (response) => {
+        _logger(response);
+    };
+
+    const msgSendError = (err) => {
+        toastr.error('Message not sent, please try again.');
+        _logger(err);
+    };
+
+    const getChatUsersErr = (err) => {
+        _logger(err);
+    };
+
+    const getMsgsError = (err) => {
+        toastr.error('Can not retrieve messages');
+        _logger(err);
+    };
+
+    //#endregion
+
+    return (
+        <>
+            <Row>
+                <Col xxl={3} xl={{ span: 6, order: 1 }}>
+                    <ChatUsers
+                        userComponents={
+                            filteredCards.toggle
+                                ? filteredCards.filteredArr.map(mapUserCards)
+                                : userCards.map(mapUserCards)
+                        }
+                        searchUsers={searchUsers}
+                    />
+                </Col>
+
+                <Col xxl={6} xl={{ span: 12, order: 2 }}>
+                    <ChatArea
+                        userMessages={userMessages}
+                        sendChatMessage={sendChatMessage}
+                        selectedUser={selectedUser}
+                        isLoading={loading}
+                    />
+                </Col>
+            </Row>
+        </>
+    );
+};
+
+Chat.propTypes = {
+    currentUser: PropTypes.shape({
+        id: PropTypes.number.isRequired,
+        name: PropTypes.string,
+        roles: PropTypes.arrayOf(PropTypes.string),
+        tenantId: PropTypes.string,
+    }),
+};
+
+export default Chat;
